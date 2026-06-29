@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Подсчет фруктов</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background: #f0f2f5;
+            padding: 24px;
+        }
+
+        .page {
+            max-width: 1000px;
+            margin: 0 auto;
+        }
+
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 24px;
+        }
+
+        header h1 {
+            color: #2c3e50;
+            font-size: 24px;
+        }
+
+        header a {
+            color: #2980b9;
+            text-decoration: none;
+            font-size: 15px;
+        }
+
+        .card {
+            background: white;
+            border-radius: 10px;
+            padding: 24px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+        }
+
+        .upload-zone {
+            border: 2px dashed #bdc3c7;
+            border-radius: 8px;
+            padding: 36px;
+            text-align: center;
+            cursor: pointer;
+        }
+
+        .upload-zone:hover {
+            border-color: #27ae60;
+        }
+
+        .fname {
+            color: #27ae60;
+            font-weight: bold;
+            font-size: 16px;
+            margin-top: 6px;
+        }
+
+        .btn {
+            padding: 10px 22px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 15px;
+            margin: 4px;
+        }
+
+        .btn-green { background: #27ae60; color: white; }
+        .btn-gray  { background: #95a5a6; color: white; }
+        .btn-red   { background: #e74c3c; color: white; font-size: 13px; padding: 6px 12px; }
+
+        .center { text-align: center; margin-top: 16px; }
+
+        #loading { display: none; text-align: center; color: #666; padding: 20px; }
+        #resultArea { display: none; }
+
+        canvas {
+            display: block;
+            margin: 0 auto;
+            max-width: 100%;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+        }
+
+        .stats-box {
+            background: #eafaf1;
+            border-left: 4px solid #27ae60;
+            padding: 12px 16px;
+            border-radius: 4px;
+            margin: 16px 0;
+            font-size: 15px;
+        }
+
+        .dot {
+            display: inline-block;
+            width: 11px;
+            height: 11px;
+            border-radius: 50%;
+            margin-right: 5px;
+            vertical-align: middle;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 8px;
+        }
+
+        th {
+            background: #27ae60;
+            color: white;
+            padding: 10px;
+            text-align: left;
+            font-weight: normal;
+        }
+
+        td {
+            padding: 8px 10px;
+            border-bottom: 1px solid #ecf0f1;
+        }
+
+        select {
+            padding: 4px 8px;
+            border-radius: 4px;
+            border: 1px solid #ccc;
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+<div class="page">
+
+    <header>
+        <h1>Подсчет фруктов</h1>
+        <a href="/history">История &rarr;</a>
+    </header>
+
+    <div class="card">
+        <div class="upload-zone" onclick="document.getElementById('fileInput').click()">
+            <p style="font-size:17px;">Нажмите, чтобы выбрать фотографию</p>
+            <p id="fname" class="fname">файл не выбран</p>
+            <p style="color:#aaa; font-size:14px;">JPG, PNG, WEBP</p>
+        </div>
+        <input type="file" id="fileInput" accept="image/*" style="display:none">
+        <div class="center">
+            <button class="btn btn-green" onclick="processImage()">Определить фрукты</button>
+        </div>
+    </div>
+
+    <div id="loading"><p>Обработка...</p></div>
+
+    <div id="resultArea" class="card">
+        <canvas id="canvas"></canvas>
+        <div class="stats-box" id="statsBox"></div>
+
+        <h3 style="margin-bottom:8px; color:#2c3e50;">Список детекций</h3>
+        <table>
+            <thead>
+                <tr>
+                    <th>№</th>
+                    <th>Фрукт</th>
+                    <th>Уверенность</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody id="tableBody"></tbody>
+        </table>
+
+        <div class="center">
+            <button class="btn btn-green" onclick="saveResults()">Сохранить в историю</button>
+            <button class="btn btn-gray"  onclick="location.reload()">Новое фото</button>
+        </div>
+    </div>
+
+</div>
+
+<script>
+    var COLORS = {{ colors|safe }};
+    var detections  = [];
+    var imageBase64 = '';
+    var filename    = '';
+
+    document.getElementById('fileInput').addEventListener('change', function(e) {
+        if (e.target.files[0]) {
+            document.getElementById('fname').textContent = e.target.files[0].name;
+        }
+    });
+
+    function processImage() {
+        var file = document.getElementById('fileInput').files[0];
+        if (!file) {
+            alert('Выберите изображение');
+            return;
+        }
+
+        var form = new FormData();
+        form.append('image', file);
+
+        document.getElementById('loading').style.display    = 'block';
+        document.getElementById('resultArea').style.display = 'none';
+
+        fetch('/process', { method: 'POST', body: form })
+            .then(function(resp) { return resp.json(); })
+            .then(function(data) {
+                if (data.error) {
+                    alert(data.error);
+                    document.getElementById('loading').style.display = 'none';
+                    return;
+                }
+
+                imageBase64 = data.image;
+                detections  = data.detections;
+                filename    = data.filename;
+
+                document.getElementById('loading').style.display    = 'none';
+                document.getElementById('resultArea').style.display = 'block';
+
+                drawCanvas();
+                renderTable();
+                renderStats();
+            });
+    }
+
+    function drawCanvas() {
+        var canvas = document.getElementById('canvas');
+        var ctx    = canvas.getContext('2d');
+        var img    = new Image();
+
+        img.onload = function() {
+            var maxWidth = 900;
+            if (window.innerWidth < 980) {
+                maxWidth = window.innerWidth - 80;
+            }
+            var scale     = maxWidth / img.width;
+            canvas.width  = img.width  * scale;
+            canvas.height = img.height * scale;
+
+            ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+
+            for (var i = 0; i < detections.length; i++) {
+                var d     = detections[i];
+                var x1    = d.x1 * scale;
+                var y1    = d.y1 * scale;
+                var x2    = d.x2 * scale;
+                var y2    = d.y2 * scale;
+                var color = COLORS[d.label] || '#00cc00';
+
+                ctx.strokeStyle = color;
+                ctx.lineWidth   = 3;
+                ctx.strokeRect(x1, y1, x2 - x1, y2 - y1);
+
+                var text = d.label + ' ' + d.confidence + '%';
+                ctx.font = 'bold 14px Arial';
+                var tw = ctx.measureText(text).width;
+                ctx.fillStyle = color;
+                ctx.fillRect(x1, y1 - 24, tw + 10, 24);
+                ctx.fillStyle = '#fff';
+                ctx.fillText(text, x1 + 5, y1 - 6);
+            }
+        };
+
+        img.src = 'data:image/jpeg;base64,' + imageBase64;
+    }
+
+    function renderTable() {
+        var tbody = document.getElementById('tableBody');
+        tbody.innerHTML = '';
+
+        if (detections.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;color:#999;padding:20px">Фрукты не обнаружены</td></tr>';
+            return;
+        }
+
+        for (var i = 0; i < detections.length; i++) {
+            var d     = detections[i];
+            var color = COLORS[d.label] || '#888';
+            var row   = document.createElement('tr');
+
+            var selectHtml =
+                '<select onchange="changeLabel(' + i + ', this.value)">' +
+                '<option value="яблоко"'   + (d.label === 'яблоко'   ? ' selected' : '') + '>яблоко</option>'   +
+                '<option value="банан"'    + (d.label === 'банан'    ? ' selected' : '') + '>банан</option>'    +
+                '<option value="апельсин"' + (d.label === 'апельсин' ? ' selected' : '') + '>апельсин</option>' +
+                '</select>';
+
+            row.innerHTML =
+                '<td>' + (i + 1) + '</td>' +
+                '<td><span class="dot" style="background:' + color + '"></span>' + selectHtml + '</td>' +
+                '<td>' + d.confidence + '%</td>' +
+                '<td><button class="btn btn-red" onclick="removeDet(' + i + ')">Удалить</button></td>';
+
+            tbody.appendChild(row);
+        }
+    }
+
+    function renderStats() {
+        var counts = {};
+        for (var i = 0; i < detections.length; i++) {
+            var label = detections[i].label;
+            counts[label] = (counts[label] || 0) + 1;
+        }
+
+        var html = '<strong>Итого: ' + detections.length + ' шт.</strong> &nbsp; ';
+        for (var label in counts) {
+            var color = COLORS[label] || '#888';
+            html += '<span class="dot" style="background:' + color + '"></span>' + label + ': ' + counts[label] + ' &nbsp; ';
+        }
+        document.getElementById('statsBox').innerHTML = html;
+    }
+
+    function changeLabel(i, val) {
+        detections[i].label = val;
+        drawCanvas();
+        renderTable();
+        renderStats();
+    }
+
+    function removeDet(i) {
+        detections.splice(i, 1);
+        drawCanvas();
+        renderTable();
+        renderStats();
+    }
+
+    function saveResults() {
+        fetch('/save', {
+            method:  'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body:    JSON.stringify({ detections: detections, filename: filename })
+        }).then(function() {
+            alert('Сохранено!');
+            window.location.href = '/history';
+        });
+    }
+</script>
+</body>
+</html>

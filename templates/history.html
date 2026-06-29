@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>История — Подсчет фруктов</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background: #f0f2f5;
+            padding: 24px;
+        }
+
+        .page {
+            max-width: 1000px;
+            margin: 0 auto;
+        }
+
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 24px;
+        }
+
+        header h1 {
+            color: #2c3e50;
+            font-size: 24px;
+        }
+
+        header a {
+            color: #2980b9;
+            text-decoration: none;
+            font-size: 15px;
+        }
+
+        .card {
+            background: white;
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 16px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+        }
+
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 12px;
+        }
+
+        .card-title {
+            font-size: 17px;
+            color: #2c3e50;
+            font-weight: bold;
+        }
+
+        .meta {
+            color: #7f8c8d;
+            font-size: 13px;
+            margin-top: 3px;
+        }
+
+        .counts {
+            background: #eafaf1;
+            border-left: 4px solid #27ae60;
+            padding: 10px 14px;
+            border-radius: 4px;
+            margin-bottom: 14px;
+            font-size: 15px;
+        }
+
+        .dot {
+            display: inline-block;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            margin-right: 4px;
+            vertical-align: middle;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 14px;
+        }
+
+        th {
+            background: #2980b9;
+            color: white;
+            padding: 8px 10px;
+            text-align: left;
+            font-weight: normal;
+        }
+
+        td {
+            padding: 7px 10px;
+            border-bottom: 1px solid #ecf0f1;
+        }
+
+        .btn-del {
+            background: none;
+            border: 1px solid #e74c3c;
+            color: #e74c3c;
+            border-radius: 4px;
+            padding: 4px 10px;
+            cursor: pointer;
+            font-size: 13px;
+        }
+
+        .btn-del:hover {
+            background: #e74c3c;
+            color: white;
+        }
+
+        .btn-excel {
+            background: none;
+            border: 1px solid #27ae60;
+            color: #27ae60;
+            border-radius: 4px;
+            padding: 4px 10px;
+            cursor: pointer;
+            font-size: 13px;
+            text-decoration: none;
+            display: inline-block;
+        }
+
+        .btn-excel:hover {
+            background: #27ae60;
+            color: white;
+        }
+
+        .card-actions {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+        }
+
+        .empty {
+            text-align: center;
+            color: #7f8c8d;
+            padding: 50px;
+        }
+
+        .empty a {
+            display: inline-block;
+            margin-top: 12px;
+            background: #27ae60;
+            color: white;
+            padding: 10px 20px;
+            border-radius: 6px;
+            text-decoration: none;
+        }
+    </style>
+</head>
+<body>
+<div class="page">
+
+    <header>
+        <h1>История результатов</h1>
+        <a href="/">&larr; Назад</a>
+    </header>
+
+    {% if not records %}
+    <div class="card empty">
+        <p>История пуста — обработайте первое изображение</p>
+        <a href="/">Перейти на главную</a>
+    </div>
+    {% endif %}
+
+    {% for r in records %}
+    <div class="card" id="record-{{ r.id }}">
+        <div class="card-header">
+            <div>
+                <div class="card-title">Запись #{{ r.id }}</div>
+                <div class="meta">{{ r.timestamp }} &nbsp;·&nbsp; {{ r.filename }}</div>
+            </div>
+            <div class="card-actions">
+                <a class="btn-excel" href="/export/{{ r.id }}">Скачать Excel</a>
+                <button class="btn-del" onclick="deleteRecord({{ r.id }})">Удалить</button>
+            </div>
+        </div>
+
+        <div class="counts">
+            <strong>Всего: {{ r.total }} шт.</strong>
+            {% for label, cnt in r.counts.items() %}
+                &nbsp;
+                {% if label == 'яблоко' %}
+                    <span class="dot" style="background:#e74c3c"></span>
+                {% elif label == 'банан' %}
+                    <span class="dot" style="background:#f1c40f"></span>
+                {% else %}
+                    <span class="dot" style="background:#e67e22"></span>
+                {% endif %}
+                {{ label }}: {{ cnt }} шт.
+            {% endfor %}
+        </div>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>№</th>
+                    <th>Фрукт</th>
+                    <th>Уверенность</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for det in r.detections %}
+                <tr>
+                    <td>{{ loop.index }}</td>
+                    <td>
+                        {% if det.label == 'яблоко' %}
+                            <span class="dot" style="background:#e74c3c"></span>
+                        {% elif det.label == 'банан' %}
+                            <span class="dot" style="background:#f1c40f"></span>
+                        {% else %}
+                            <span class="dot" style="background:#e67e22"></span>
+                        {% endif %}
+                        {{ det.label }}
+                    </td>
+                    <td>{{ det.confidence }}%</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% endfor %}
+
+</div>
+<script>
+    function deleteRecord(id) {
+        if (!confirm('Удалить запись?')) return;
+        fetch('/delete/' + id, { method: 'POST' }).then(function() {
+            document.getElementById('record-' + id).remove();
+        });
+    }
+</script>
+</body>
+</html>
